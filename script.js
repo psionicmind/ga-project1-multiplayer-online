@@ -38,6 +38,7 @@ let discFlashWaitTime = 50;
 let countDownWaitTime = 200;
 let hanoiArray = [];
 let players = [];
+let playersList = [];
 const maxSidebySidePlayers = 20;
 let currentNumberOfSidebySidePlayers = 1;
 let currentNumberOfPlayers = 0;
@@ -192,7 +193,8 @@ function clientSetup() {
   // socket = io(`ws://${serverIP}:8080`);
 
   // socket = io("ws://localhost:8080");
-  socket = io("ws://127.0.0.1:8080");
+  // socket = io("ws://127.0.0.1:8080");
+  socket = io("ws://192.168.175.32:8080");
 
   // receive message
   // socket.on("message", (text) => {
@@ -201,6 +203,7 @@ function clientSetup() {
 
   // receive message
   socket.on("message", (text) =>{
+    console.log("data incoming!")
     otherPlayersAction(text);
   }) ;
 
@@ -224,7 +227,34 @@ function otherPlayersAction(text){
       case "win":
         AnnounceWinnerFreezeGame(username)
         break;
-    
+      case "addplayer":
+        if (playersList.includes(username))        
+        {
+          console.log("your screen got this player")
+        }
+        else{
+          addPlayer(username, false);
+        }
+        // sendYourActionOnline(username, "updatePlayerList", playersList)
+        break;
+      case "updatePlayerList":
+        let missingPlayers =[];
+        for (let index = 0; index < jsonText["value"].length; index++) {
+          for (let index2 = 0; index2 < playersList.length; index2++) {
+            if (playersList[index2].includes(jsonText["value"][index])){
+              console.log("player present in your list");
+            }
+            else{
+              missingPlayers.push(jsonText["value"][index]);
+            }            
+          }          
+        }
+        for (let index3 = 0; index3 < missingPlayers.length; index3++) {
+          addPlayer(missingPlayers[index]);          
+        }
+
+        break;
+
       default:
         break;
     }
@@ -232,20 +262,29 @@ function otherPlayersAction(text){
 }
 
 function sendYourActionOnline(user, action, val){
-  let message = null;
+  socket.id = user;
+  let message = {};
+  // testjson = { username: "king", action: "addplayer", value: 0 };
   switch (action) {
     case "move":
-      message = {username:user, action:"move", value: val }
+      message = {username: user, action: "move", value: val }
       break;
     case "win":
-      message = {username:user, action:"win", value: null }
+      message = {username: user, action: "win", value: val }
       break;
-  
+    case "addplayer":
+      message = {username: `${user}`, action: "addplayer", value: val }
+      break;
+    // case "updatePlayerList":
+    //   message = {username: user, action: "updatePlayerList", value: playersList}
+    //   break;
+
     default:
       break;
   }
-
-  socket.emit(message);
+  console.log(message);
+  socket.emit("message", message);
+  return message;
 }
 
 // https://stackoverflow.com/questions/4427094/how-can-i-duplicate-a-div-onclick-event
@@ -279,7 +318,7 @@ function startCountDown() {
 
 function addPlayer(username, IsMainPlayer) {  // action : addPlayer(username, false);
   players[username] = new TowerOfHaoi();
-
+  playersList.push(username);
   if (IsMainPlayer) baseContainer.id = username;
   else {
     UiDuplicateTowerOfHanoi(username);
@@ -529,19 +568,26 @@ function movement(username, keyNumber) {
 
 testButton.addEventListener("click", function(event){
   // send out message using EMIT
-  testjson = { username: "king", action: "move", value: 13 };
-  socket.id = "king";
-  socket.emit("message", testjson);
+  // testjson = { username: "king", action: "move", value: 13 };
+
+  // testjson = { username: "king", action: "addplayer", value: 0 };
+  // socket.id = "king";
+  // socket.emit("message", testjson);
+
+  sendyouractiononlineReturn = sendYourActionOnline("king","addplayer", 0);  
 })
 
 submitServerIPbutton.addEventListener("click", function(event){
   clientSetup();
+  sendYourActionOnline(mainPlayerName, "addplayer", 0)
 })
 
 addSidePlayerButton.addEventListener("click", function (event) {
   if (currentNumberOfSidebySidePlayers < maxSidebySidePlayers) {
     sideBySidePlayerName = getSidebySidePlayerName();
     addPlayer(sideBySidePlayerName, false);
+    sendYourActionOnline(sideBySidePlayerName,"addplayer", 0);
+
 
     // make race feature enabled
     startCountDownButton.style.visibility = "visible";
@@ -638,8 +684,8 @@ function toTowerSelectedPostProcess(username) {
 
   // rules check, all ok, can move pieces from tower to tower.
   movement(username, moveCode);
-  if (username === mainPlayerName){
-    sendYourActionOnline(username, "moveCode", moveCode)
+  if ((username === mainPlayerName)||(username === sideBySidePlayerName)){
+    sendYourActionOnline(username, "move", moveCode)
   }
 
   players[username].fromTower = -1;
@@ -707,7 +753,7 @@ function checkWin(username) {
 
 function AnnounceWinnerFreezeGame(username) { // action
   if (username===mainPlayerName){
-    sendYourActionOnline(username, "win", null);
+    sendYourActionOnline(username, "win", 0);
   }
 
   for (player in players) {
