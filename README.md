@@ -1,5 +1,5 @@
-# ga-project1
-ga-project1
+# ga-project1-multiplayer-online
+ga-project1-multiplayer-online
 
 # Tower of Hanoi
 
@@ -11,7 +11,7 @@ ga-project1
 Édouard Lucas
 
 # Start Game Now!
-[Let's GO!](https://ga-project1-multiplayer.vercel.app/)
+[Let's GO!](https://ga-project1-multiplayer-online.vercel.app/)
 
 # Games Description
 Tower of Hanoi is a mathematical game which consist of three sticks and a number of disc of various diameters.  The game begins with all discs stacked with the biggest disc at the bottom of the stick to the smallest disc at the top of the stick.
