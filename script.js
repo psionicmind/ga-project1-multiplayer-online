@@ -1,7 +1,3 @@
-// Reference: https://www.youtube.com/watch?v=OUWFY1qY47Y by Adson Paulo Aug 30, 202
-
-// import {startStopwatch, stopStopwatch, stopWatchStartTime } from './helperClass/stopwatch.js';
-
 // LOGIC
 // Shared variables among multiplayers
 const movements = {
@@ -29,9 +25,7 @@ const serverClientType = {
   client: "client",
 };
 
-// let io = undefined;
-// let socket = undefined;
-let socket = null;//io("ws://localhost:8080");
+let socket = null;
 
 let numberOfDisc = 3;
 let discFlashWaitTime = 50;
@@ -39,36 +33,28 @@ let countDownWaitTime = 200;
 let hanoiArray = [];
 let players = [];
 let playersList = [];
-const maxSidebySidePlayers = 20;
-let currentNumberOfSidebySidePlayers = 1;
+const maxSidebySidePlayers = 2;
+let currentNumberOfSidebySidePlayers = 0;
+const maxNumberOfPlayers = 20;
 let currentNumberOfPlayers = 0;
 let serverOrClient = undefined; //"server"; // "client"
 let IsStartNow = false;
 
 let browserPageZoomPc = 100;
-// x3
-// let htmlTowers = document.querySelectorAll('.tower')
-
-// x1
-// let feedback = document.querySelector(".feedback")
-// let steps = document.querySelector(".steps")
-
-// let container = document.querySelectorAll(".container")[0]
 var baseContainer = document.getElementsByClassName("container")[0];
 
-// var serverRadioBtn = document.getElementById("server");
-// var clientRadioBtn = document.getElementById("client");
 var serverLabel = document.getElementsByClassName("server-label")[0];
 var clientEditBoxForServerIP = document.getElementsByClassName("client-IP")[0];
-var submitServerIPbutton= document.getElementsByClassName("submit-server-ip")[0];
-var testButton= document.getElementsByClassName("test")[0];
-
+var submitServerIPbutton =
+  document.getElementsByClassName("submit-server-ip")[0];
+var addMainplayerOnline = document.getElementsByClassName(
+  "add-mainplayer-online"
+)[0];
 
 var addSidePlayerButton = document.getElementsByClassName("add-side-player")[0];
 var addSidePlayerNameEditBox = document.getElementsByClassName(
   "add-side-player-name"
 )[0];
-// let timer = document.querySelector(".timer")
 var startCountDownButton = document.getElementsByClassName(
   "start-countdown-button"
 )[0];
@@ -119,7 +105,7 @@ const discColors = [
   "BurlyWood",
 ];
 
-// individual player's varaible
+// data class with ui handler declared.
 class TowerOfHaoi {
   constructor() {
     // Data
@@ -150,107 +136,61 @@ class TowerOfHaoi {
   }
 }
 
-// Server Client Code
-function serverSetup() {
-  // const serverIP = fetchYourOwnIP();
-  //
-  //   const serverIP = "192.168.0.108";
-  //   const ws = `ws://${serverIP}:8080`;
-  //   serverLabel.innerHTML += `  ${ws} `;
-  //   http = require("http").createServer();
-  //   io = require("socket.io")(http, {
-  //     cors: { origin: "*" },
-  //   });
-  //   io.on("connection", (socket) => {
-  //     console.log("a user connected");
-  //     socket.on("message", (message) => {
-  //       console.log(message);
-  //       console.log("server received message: " + JSON.stringify(message));
-  //       io.emit(
-  //         "message",
-  //         // `${socket.id.substr(0, 2)} said ${JSON.stringify(message)}`
-  //         `${socket.id} said ${JSON.stringify(message)}`
-  //       );
-  //     });
-  //   });
-  //   http.listen(8080, () => console.log("listening on http://localhost:8080"));
-}
+function clientSetup() {
+  const serverIP = clientEditBoxForServerIP.value;
+  socket = io(`ws://${serverIP}:8080`);
 
-function fetchYourOwnIP(cmd) {
-  var process = require("child_process");
-  process.exec(cmd, function (err, stdout, stderr) {
-    if (err) {
-      console.log("\n" + stderr);
-    } else {
-      console.log(stdout);
-    }
+  // receive message
+  socket.on("message", (text) => {
+    console.log("data incoming!");
+    otherPlayersAction(text);
   });
 }
 
-function clientSetup() {
-  // use 192.168.0.108
-  // const serverIP = clientEditBoxForServerIP.innerHTML;
-  // socket = io(`ws://${serverIP}:8080`);
-
-  // socket = io("ws://localhost:8080");
-  // socket = io("ws://127.0.0.1:8080");
-  socket = io("ws://192.168.175.32:8080");
-
-  // receive message
-  // socket.on("message", (text) => {
-  //   console.log(`text=${text}`);
-  // });
-
-  // receive message
-  socket.on("message", (text) =>{
-    console.log("data incoming!")
-    otherPlayersAction(text);
-  }) ;
-
-}
-
-function otherPlayersAction(text){
-  const jsonText = JSON.parse(text)
+function otherPlayersAction(text) {
+  const jsonText = JSON.parse(text);
   console.log(jsonText);
   console.log(jsonText["username"]);
 
   const username = jsonText["username"];
-  if (username === mainPlayerName)
+  if ((username === mainPlayerName)&&   (jsonText["action"]!="resetGame"))
     return; // ignore your own action that is boomerang-ed
-  else{
-    console.log("update your screen of other player action")
+  else {
+    console.log("update your screen of other player action");
 
     switch (jsonText["action"]) {
       case "move":
-        movement(username, (+jsonText["value"]))
+        movement(username, +jsonText["value"]);
         break;
       case "win":
-        AnnounceWinnerFreezeGame(username)
+        AnnounceWinnerFreezeGame(username);
         break;
       case "addplayer":
-        if (playersList.includes(username))        
-        {
-          console.log("your screen got this player")
-        }
-        else{
+        if (playersList.includes(username)) {
+          console.log("your screen got this player");
+        } else {
           addPlayer(username, false);
         }
-        // sendYourActionOnline(username, "updatePlayerList", playersList)
+        break;
+      case "start":
+        startCountDown();
+        break;
+      case "resetGame":
+        resetGame(username);
         break;
       case "updatePlayerList":
-        let missingPlayers =[];
+        let missingPlayers = [];
         for (let index = 0; index < jsonText["value"].length; index++) {
           for (let index2 = 0; index2 < playersList.length; index2++) {
-            if (playersList[index2].includes(jsonText["value"][index])){
+            if (playersList[index2].includes(jsonText["value"][index])) {
               console.log("player present in your list");
-            }
-            else{
+            } else {
               missingPlayers.push(jsonText["value"][index]);
-            }            
-          }          
+            }
+          }
         }
         for (let index3 = 0; index3 < missingPlayers.length; index3++) {
-          addPlayer(missingPlayers[index]);          
+          addPlayer(missingPlayers[index], false);
         }
 
         break;
@@ -261,23 +201,26 @@ function otherPlayersAction(text){
   }
 }
 
-function sendYourActionOnline(user, action, val){
+function sendYourActionOnline(user, action, val) {
   socket.id = user;
   let message = {};
-  // testjson = { username: "king", action: "addplayer", value: 0 };
+
   switch (action) {
     case "move":
-      message = {username: user, action: "move", value: val }
+      message = { username: user, action: "move", value: val };
       break;
     case "win":
-      message = {username: user, action: "win", value: val }
+      message = { username: user, action: "win", value: val };
       break;
     case "addplayer":
-      message = {username: `${user}`, action: "addplayer", value: val }
+      message = { username: `${user}`, action: "addplayer", value: val };
       break;
-    // case "updatePlayerList":
-    //   message = {username: user, action: "updatePlayerList", value: playersList}
-    //   break;
+    case "start":
+      message = { username: user, action: "start", value: val };
+      break;
+    case "resetGame":
+      message = { username: user, action: "resetGame", value: val };
+      break;
 
     default:
       break;
@@ -316,21 +259,24 @@ function startCountDown() {
   });
 }
 
-function addPlayer(username, IsMainPlayer) {  // action : addPlayer(username, false);
+function addPlayer(username, IsMainPlayer) {
   players[username] = new TowerOfHaoi();
   playersList.push(username);
   if (IsMainPlayer) baseContainer.id = username;
   else {
     UiDuplicateTowerOfHanoi(username);
-    // players[username].tower1 = structuredClone(players[mainPlayerName].tower1);
-    // players[username].tower2 = structuredClone(players[mainPlayerName].tower2);
-    // players[username].tower3 = structuredClone(players[mainPlayerName].tower3);
     players[username].tower1 = [...players[mainPlayerName].tower1];
     players[username].tower2 = [...players[mainPlayerName].tower2];
     players[username].tower3 = [...players[mainPlayerName].tower3];
   }
 
   AssignElementsToDerivedClass(username); // ui
+
+  currentNumberOfPlayers++;
+  if (currentNumberOfPlayers>=2){
+    showRaceUiElement()
+  };
+
   if (IsMainPlayer) {
     generateTower(username, numberOfDisc); // data
     UiCreateDisc(username); // ui
@@ -346,12 +292,11 @@ function addPlayer(username, IsMainPlayer) {  // action : addPlayer(username, fa
       "Welcome to Tower of Hanoi ! Control Keys are z, x and c"
     );
   }
-
-  currentNumberOfPlayers++;
 }
 
 // this function can only be use after UI is cloned
-function AssignElementsToDerivedClass(username) {  // internal
+function AssignElementsToDerivedClass(username) {
+  // internal
   newUser = document.getElementById(username);
   players[username].username = username;
   players[username].htmlTowers = newUser.querySelectorAll(".tower");
@@ -370,11 +315,13 @@ function AssignElementsToDerivedClass(username) {  // internal
   );
 
   players[username].resetButton.addEventListener("click", function (event) {
+    sendYourActionOnline(username, "resetGame",0)
     resetGame(username);
   });
 }
 
-function resizeBrowserPageZoom() { // internal
+function resizeBrowserPageZoom() {
+  // internal
   browserPageZoomPc *= 0.9;
   if (browserPageZoomPc > 50) {
     document.body.style.zoom = `${browserPageZoomPc}%`;
@@ -383,13 +330,14 @@ function resizeBrowserPageZoom() { // internal
   }
 }
 
-// can have ui edit box and button to register Main player username
-function getMainPlayerName() { // internal
+function getMainPlayerName() {
+  // internal
   return placeholderNames[Math.floor(Math.random() * placeholderNames.length)];
 }
-const mainPlayerName = getMainPlayerName();
+let mainPlayerName = getMainPlayerName();
 
-function getSidebySidePlayerName() {  // internal 
+function getSidebySidePlayerName() {
+  // internal
   if (addSidePlayerNameEditBox.value === "")
     return addSidePlayerNameEditBox.placeholder;
   else return addSidePlayerNameEditBox.value;
@@ -397,11 +345,9 @@ function getSidebySidePlayerName() {  // internal
 
 let sideBySidePlayerName = "";
 
-// sideBySidePlayerName = getSidebySidePlayerName();
-
 addPlayer(mainPlayerName, true);
 
-function deletePlayer(username) {  // icebox
+function deletePlayer(username) {
   // get container by id and remove
   document.getElementById(username).remove();
   if (players[username].typeOfPlayer === typeOfPlayer.sidebyside) {
@@ -553,51 +499,29 @@ function movement(username, keyNumber) {
   }
 }
 
-// serverRadioBtn.addEventListener("click", function (event) {
-//   console.log("server radioButtons panel clicked");
-//   serverOrClient = "server"
-//   console.log(`radio button value = ${serverOrClient}`);
+addMainplayerOnline.addEventListener("click", function (event) {
+  sendyouractiononlineReturn = sendYourActionOnline(mainPlayerName, "addplayer",0);
+});
 
-//   serverSetup();
-// });
-
-// clientRadioBtn.addEventListener("click", function (event) {
-//     clientEditBoxForServerIP.focus();
-//     clientEditBoxForServerIP.select();
-// });
-
-testButton.addEventListener("click", function(event){
-  // send out message using EMIT
-  // testjson = { username: "king", action: "move", value: 13 };
-
-  // testjson = { username: "king", action: "addplayer", value: 0 };
-  // socket.id = "king";
-  // socket.emit("message", testjson);
-
-  sendyouractiononlineReturn = sendYourActionOnline("king","addplayer", 0);  
-})
-
-submitServerIPbutton.addEventListener("click", function(event){
+submitServerIPbutton.addEventListener("click", function (event) {
   clientSetup();
-  sendYourActionOnline(mainPlayerName, "addplayer", 0)
-})
+});
 
 addSidePlayerButton.addEventListener("click", function (event) {
   if (currentNumberOfSidebySidePlayers < maxSidebySidePlayers) {
     sideBySidePlayerName = getSidebySidePlayerName();
-    addPlayer(sideBySidePlayerName, false);
-    sendYourActionOnline(sideBySidePlayerName,"addplayer", 0);
 
+    currentNumberOfSidebySidePlayers++;
 
-    // make race feature enabled
-    startCountDownButton.style.visibility = "visible";
-    countdownLabelNo3.style.visibility = "visible";
-    countdownLabelNo2.style.visibility = "visible";
-    countdownLabelNo1.style.visibility = "visible";
-    countdownLabelGo.style.visibility = "visible";
+    if (currentNumberOfSidebySidePlayers === 0) {
+      mainPlayerName = sideBySidePlayerName;
+      addPlayer(sideBySidePlayerName, true);
+    } else addPlayer(sideBySidePlayerName, false);
+
+    sendYourActionOnline(sideBySidePlayerName, "addplayer", 0);
 
     resizeBrowserPageZoom();
-    currentNumberOfSidebySidePlayers++;
+    
     // things to do after max side by side player is reached.
     if (currentNumberOfSidebySidePlayers >= maxSidebySidePlayers) {
       addSidePlayerNameEditBox.placeholder = "No more can be added";
@@ -608,19 +532,30 @@ addSidePlayerButton.addEventListener("click", function (event) {
   }
 });
 
+function showRaceUiElement() {
+  // make race feature enabled
+  startCountDownButton.style.visibility = "visible";
+  countdownLabelNo3.style.visibility = "visible";
+  countdownLabelNo2.style.visibility = "visible";
+  countdownLabelNo1.style.visibility = "visible";
+  countdownLabelGo.style.visibility = "visible";
+}
+
 startCountDownButton.addEventListener("click", function (event) {
+  sendYourActionOnline(mainPlayerName, "start", 0);
   startCountDown();
 });
 
 // this eventlistener is only for player or players(2) playing on one browser.
 document.addEventListener("keydown", function (event) {
-  // console.log(typeof (event.key)) // it is a string
   switch (event.key) {
     case "1":
     case "2":
     case "3":
-      if ((document.activeElement === addSidePlayerNameEditBox) ||  
-      (document.activeElement === clientEditBoxForServerIP))
+      if (
+        document.activeElement === addSidePlayerNameEditBox ||
+        document.activeElement === clientEditBoxForServerIP
+      )
         break;
       username = mainPlayerName;
       eventKeyProcess(username, event.key);
@@ -684,20 +619,15 @@ function toTowerSelectedPostProcess(username) {
 
   // rules check, all ok, can move pieces from tower to tower.
   movement(username, moveCode);
-  if ((username === mainPlayerName)||(username === sideBySidePlayerName)){
-    sendYourActionOnline(username, "move", moveCode)
+  if (username === mainPlayerName || username === sideBySidePlayerName) {
+    sendYourActionOnline(username, "move", moveCode);
   }
 
   players[username].fromTower = -1;
   players[username].toTower = -1;
-  // consoleLogTowerInfo();
+  consoleLogTowerInfo(username);
   if (checkWin(username)) {
-    if (currentNumberOfPlayers === 1) stopStopwatch(username);
-    else {
-      for (player in players) {
-        stopStopwatch(player);
-      }
-    }
+    console.log(`${username} wins!`)
   }
   return false;
 }
@@ -744,15 +674,15 @@ function checkWin(username) {
     players[username].tower2.length == numberOfDisc ||
     players[username].tower3.length == numberOfDisc
   ) {
-
     AnnounceWinnerFreezeGame(username);
 
     return true;
   } else return false;
 }
 
-function AnnounceWinnerFreezeGame(username) { // action
-  if (username===mainPlayerName){
+function AnnounceWinnerFreezeGame(username) {
+  // action
+  if (username === mainPlayerName) {
     sendYourActionOnline(username, "win", 0);
   }
 
@@ -762,27 +692,30 @@ function AnnounceWinnerFreezeGame(username) { // action
 
     if (player != username) {
       UiUpdateFeedback(player, "You LOSE!");
-    }
-    else{
+    } else {
       UiUpdateFeedback(username, "YOU WIN!");
     }
-
   }
+
+  if (currentNumberOfPlayers === 1) stopStopwatch(username);
+  else {
+    for (player in players) {
+      stopStopwatch(player);
+    }
+  }
+
+
 }
 
 //HTML
 
 function UiCreateDisc(username) {
   for (let index = 0; index < numberOfDisc; index++) {
-    // let basePlate = document.getElementsByClassName('base-plate');
     let tempDisc = document.createElement("div");
     tempDisc.classList.add("disc"); // so can use disc class at css
     tempDisc.style.backgroundColor = discColors[index];
-    // tempDisc.style.width = basePlate.style.width - (index * 10);
     tempDisc.style.width = 180 - (index + 1) * 20 + "px";
 
-    // initially on game start, only tower 1 will be loaded with disc,
-    // from largest to smallest size.
     players[username].discs.push(tempDisc);
   }
 }
@@ -869,29 +802,16 @@ function blinkElement(element) {
 // https://www.geeksforgeeks.org/c-program-for-tower-of-hanoi/
 
 function hanoiAlgo2(n, from_Tower, to_Tower, aux_Tower) {
-  // setTimeout( ()=>{
-  // console.log(`${n}, ${from_Tower}, ${to_Tower}, ${aux_Tower}`)
   if (n === 0) {
     console.log("return");
     return;
   }
-  // (async () => {
   hanoiAlgo2(n - 1, from_Tower, aux_Tower, to_Tower);
-  // console.log(`move disc ${n} from ${from_Tower} to ${to_Tower}`);
   console.log(`move disc from ${from_Tower} to ${to_Tower}`);
   hanoiArray.push({ from_Tower, to_Tower });
-  // document.dispatchEvent(new KeyboardEvent('keydown', {'key': from_Tower}));
-
-  // https://www.sitepoint.com/delay-sleep-pause-wait/
-  // // sleep2(1000);
-  // // await sleep(1000);
-  // document.dispatchEvent(new KeyboardEvent('keydown', {'key': to_Tower}));
   hanoiAlgo2(n - 1, aux_Tower, to_Tower, from_Tower);
-  // })();
-  // }, 1000)
 }
 
-// hanoiAlgo1(numberOfDisc, towerNumber.tower1+1, towerNumber.tower3+1, towerNumber.tower2+1)
 hanoiAlgo2(
   numberOfDisc,
   towerNumber.tower1 + 1,
@@ -905,7 +825,6 @@ function startStopwatch(username) {
   if (!players[username].stopwatchInterval) {
     players[username].stopWatchStartTime =
       new Date().getTime() - players[username].elapsedPausedTime; // get the starting time by subtracting the elapsed paused time from the current time
-    // players[username].stopwatchInterval = setInterval(updateStopwatch(username), 1000); // update every second
     players[username].stopwatchInterval = setInterval(
       updateStopwatch,
       1000,
@@ -979,7 +898,7 @@ function resetGame(username) {
   if (currentNumberOfPlayers > 1) {
     for (player in players) resetEachPlayer(player);
   } else resetEachPlayer(username);
-
+  
   startCountDownButton.disabled = false;
   countdownLabelNo1.style.color = "grey";
   countdownLabelNo2.style.color = "grey";
@@ -989,7 +908,6 @@ function resetGame(username) {
 
 function resetEachPlayer(username) {
   console.log("reset game");
-  // players[username].elapsedPausedTime=0;
   players[username].stopWatchStartTime = 0;
   resetStopwatch(username);
 
@@ -1020,8 +938,6 @@ function resetEachPlayer(username) {
   loadAllDiscToTower1(username);
   UiLoadDiscColor(username);
   UiUpdateFeedback(username, "Game Reset");
-  if (currentNumberOfPlayers>1)
-    IsStartNow = false;
-  else
-    IsStartNow = true;
+  if (currentNumberOfPlayers > 1) IsStartNow = false;
+  else IsStartNow = true;
 }
