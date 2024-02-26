@@ -40,28 +40,20 @@
   .timer{
     width: 300px;
     align-items:flex-start;    
-    /* justify-content: left; */
     display: grid;
-    /* flex-direction: column; */
   }
 
   .steps{
     width:300px;
     align-items:end;    
-    /* justify-content: right; */
     display: grid;
-    /* flex-direction: column; */
   }
 
   .hanoi-board {        
     height: 200px;
     background: dodgerblue;
     display: flex;
-    /* justify-content: space-around; */
     align-items: center;
-    /* border-radius: 5px; */
-    /* gap: 10px; */
-    /* padding: 10px; */
   }
   
   .tower {
