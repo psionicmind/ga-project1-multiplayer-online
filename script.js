@@ -2,9 +2,6 @@
 
 // import {startStopwatch, stopStopwatch, stopWatchStartTime } from './helperClass/stopwatch.js';
 
-// const socket = io("ws://localhost:8080");
-// const socket = io("ws://192.168.0.109:8080");// point to server ip address
-
 // LOGIC
 // Shared variables among multiplayers
 const movements = {
@@ -43,7 +40,7 @@ let hanoiArray = [];
 let players = [];
 const maxSidebySidePlayers = 20;
 let currentNumberOfSidebySidePlayers = 1;
-let currentNumberOfPlayers = 1;
+let currentNumberOfPlayers = 0;
 let serverOrClient = undefined; //"server"; // "client"
 let IsStartNow = false;
 
@@ -96,6 +93,16 @@ const placeholderNames = [
   "Gluttony",
   "Wrath",
   "Sloth",
+  "Ken",
+  "Kenneth",
+  "Robert",
+  "Henry",
+  "Woods",
+  "Kinly",
+  "Rock",
+  "Yellen",
+  "MonkeyKing",
+  "Basher",
 ];
 
 // https://www.w3schools.com/tags/ref_colornames.asp
@@ -185,12 +192,60 @@ function clientSetup() {
   // socket = io(`ws://${serverIP}:8080`);
 
   // socket = io("ws://localhost:8080");
-  socket = io("ws://192.168.0.108:8080");
-  // receive message
-  socket.on("message", (text) => {
-    console.log(`text=${text}`);
-  });
+  socket = io("ws://127.0.0.1:8080");
 
+  // receive message
+  // socket.on("message", (text) => {
+  //   console.log(`text=${text}`);
+  // });
+
+  // receive message
+  socket.on("message", (text) =>{
+    otherPlayersAction(text);
+  }) ;
+
+}
+
+function otherPlayersAction(text){
+  const jsonText = JSON.parse(text)
+  console.log(jsonText);
+  console.log(jsonText["username"]);
+
+  const username = jsonText["username"];
+  if (username === mainPlayerName)
+    return; // ignore your own action that is boomerang-ed
+  else{
+    console.log("update your screen of other player action")
+
+    switch (jsonText["action"]) {
+      case "move":
+        movement(username, (+jsonText["value"]))
+        break;
+      case "win":
+        AnnounceWinnerFreezeGame(username)
+        break;
+    
+      default:
+        break;
+    }
+  }
+}
+
+function sendYourActionOnline(user, action, val){
+  let message = null;
+  switch (action) {
+    case "move":
+      message = {username:user, action:"move", value: val }
+      break;
+    case "win":
+      message = {username:user, action:"win", value: null }
+      break;
+  
+    default:
+      break;
+  }
+
+  socket.emit(message);
 }
 
 // https://stackoverflow.com/questions/4427094/how-can-i-duplicate-a-div-onclick-event
@@ -222,7 +277,7 @@ function startCountDown() {
   });
 }
 
-function addPlayer(username, IsMainPlayer) {
+function addPlayer(username, IsMainPlayer) {  // action : addPlayer(username, false);
   players[username] = new TowerOfHaoi();
 
   if (IsMainPlayer) baseContainer.id = username;
@@ -252,10 +307,12 @@ function addPlayer(username, IsMainPlayer) {
       "Welcome to Tower of Hanoi ! Control Keys are z, x and c"
     );
   }
+
+  currentNumberOfPlayers++;
 }
 
 // this function can only be use after UI is cloned
-function AssignElementsToDerivedClass(username) {
+function AssignElementsToDerivedClass(username) {  // internal
   newUser = document.getElementById(username);
   players[username].username = username;
   players[username].htmlTowers = newUser.querySelectorAll(".tower");
@@ -278,7 +335,7 @@ function AssignElementsToDerivedClass(username) {
   });
 }
 
-function resizeBrowserPageZoom() {
+function resizeBrowserPageZoom() { // internal
   browserPageZoomPc *= 0.9;
   if (browserPageZoomPc > 50) {
     document.body.style.zoom = `${browserPageZoomPc}%`;
@@ -288,12 +345,12 @@ function resizeBrowserPageZoom() {
 }
 
 // can have ui edit box and button to register Main player username
-function getMainPlayerName() {
-  return "ken";
+function getMainPlayerName() { // internal
+  return placeholderNames[Math.floor(Math.random() * placeholderNames.length)];
 }
 const mainPlayerName = getMainPlayerName();
 
-function getSidebySidePlayerName() {
+function getSidebySidePlayerName() {  // internal 
   if (addSidePlayerNameEditBox.value === "")
     return addSidePlayerNameEditBox.placeholder;
   else return addSidePlayerNameEditBox.value;
@@ -305,7 +362,7 @@ let sideBySidePlayerName = "";
 
 addPlayer(mainPlayerName, true);
 
-function deletePlayer(username) {
+function deletePlayer(username) {  // icebox
   // get container by id and remove
   document.getElementById(username).remove();
   if (players[username].typeOfPlayer === typeOfPlayer.sidebyside) {
@@ -472,7 +529,7 @@ function movement(username, keyNumber) {
 
 testButton.addEventListener("click", function(event){
   // send out message using EMIT
-  testjson = { username: "king", action: "move", fromtower: 1, totower: 2 };
+  testjson = { username: "king", action: "move", value: 13 };
   socket.id = "king";
   socket.emit("message", testjson);
 })
@@ -494,11 +551,9 @@ addSidePlayerButton.addEventListener("click", function (event) {
     countdownLabelGo.style.visibility = "visible";
 
     resizeBrowserPageZoom();
-
-    // things to do after max side by side player is reached.
-    currentNumberOfPlayers++;
     currentNumberOfSidebySidePlayers++;
-    if (currentNumberOfSidebySidePlayers === maxSidebySidePlayers) {
+    // things to do after max side by side player is reached.
+    if (currentNumberOfSidebySidePlayers >= maxSidebySidePlayers) {
       addSidePlayerNameEditBox.placeholder = "No more can be added";
       addSidePlayerButton.disabled = true;
     } else
@@ -583,6 +638,9 @@ function toTowerSelectedPostProcess(username) {
 
   // rules check, all ok, can move pieces from tower to tower.
   movement(username, moveCode);
+  if (username === mainPlayerName){
+    sendYourActionOnline(username, "moveCode", moveCode)
+  }
 
   players[username].fromTower = -1;
   players[username].toTower = -1;
@@ -640,17 +698,18 @@ function checkWin(username) {
     players[username].tower2.length == numberOfDisc ||
     players[username].tower3.length == numberOfDisc
   ) {
-    console.log("YOU WIN!");
-    UiUpdateFeedback(username, "YOU WIN!");
+
     AnnounceWinnerFreezeGame(username);
-    // app.say("You Win!")
+
     return true;
   } else return false;
 }
 
-function AnnounceWinnerFreezeGame(username) {
-  const message = { username: username, action: "win" };
-  // socket.emit("message", message);
+function AnnounceWinnerFreezeGame(username) { // action
+  if (username===mainPlayerName){
+    sendYourActionOnline(username, "win", null);
+  }
+
   for (player in players) {
     console.log(player);
     players[player].winner = username; // this only set the data in mainplayer's computer.
@@ -658,6 +717,10 @@ function AnnounceWinnerFreezeGame(username) {
     if (player != username) {
       UiUpdateFeedback(player, "You LOSE!");
     }
+    else{
+      UiUpdateFeedback(username, "YOU WIN!");
+    }
+
   }
 }
 
@@ -905,9 +968,14 @@ function resetEachPlayer(username) {
   players[username].fromTower = -1;
   players[username].toTower = -1;
   players[username].showSolutionSteps = 0;
+  players[username].winner = "";
 
   generateTower(username, numberOfDisc);
   loadAllDiscToTower1(username);
   UiLoadDiscColor(username);
   UiUpdateFeedback(username, "Game Reset");
+  if (currentNumberOfPlayers>1)
+    IsStartNow = false;
+  else
+    IsStartNow = true;
 }
